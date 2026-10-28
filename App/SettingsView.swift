@@ -102,7 +102,10 @@ struct SettingsView: View {
                 }
             }
         default:
-            Color.clear
+            // Not an empty gap: the row has a fixed height, so say something useful in it.
+            Label("Уведомления разрешены", systemImage: "checkmark.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(Theme.ok)
         }
     }
 

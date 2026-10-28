@@ -32,15 +32,17 @@ public struct NetWatchLargeView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // Every row has its natural height except the graph, which takes whatever is left. The real widget is shorter than
+        // the nominal size once the system margins are subtracted, and a fixed-height graph made the rest overflow and get clipped.
+        VStack(alignment: .leading, spacing: 8) {
             StatusHeader(s: snapshot, rangeButton: rangeButton)
             MetricsRow(s: snapshot)
             HourGraph(s: snapshot, showGateway: true)
-                .frame(height: 118)
+                .frame(minHeight: 56, maxHeight: .infinity)
             Rectangle().fill(Theme.faint).frame(height: 1)
             WifiRow(wifi: snapshot.latest?.wifi)
+            if let router = snapshot.latest?.router { RouterRow(stats: router) }
             IncidentsList(incidents: Array(snapshot.incidents.prefix(3)), range: snapshot.range, networkName: snapshot.networkName)
-            Spacer(minLength: 0)
         }
     }
 }

@@ -35,6 +35,10 @@ await MainActor.run {
     save(NetWatchMediumView(snapshot: bad), size: WidgetSizes.medium, name: "medium-mock-bad")
     save(NetWatchLargeView(snapshot: Mock.snapshot(now: now, current: .degraded)), size: WidgetSizes.large, name: "large-mock-degraded")
 
+    // The real widget is shorter than its nominal 382 pt; these must still fit without clipping.
+    save(NetWatchLargeView(snapshot: ok), size: CGSize(width: 364, height: 340), name: "large-mock-ok-short")
+    save(NetWatchLargeView(snapshot: ok), size: CGSize(width: 364, height: 310), name: "large-mock-ok-shorter")
+
     let day = Mock.snapshot(now: now, days: 7, range: .day)
     let week = Mock.snapshot(now: now, days: 7, range: .week)
     save(NetWatchMediumView(snapshot: day), size: WidgetSizes.medium, name: "medium-mock-day")

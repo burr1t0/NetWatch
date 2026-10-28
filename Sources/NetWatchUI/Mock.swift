@@ -19,7 +19,8 @@ public enum Mock {
                 direct: Probe(sent: 3, received: 3, avgMs: 12 + wobble * 4, maxMs: 20),
                 direct2: Probe(sent: 3, received: 3, avgMs: 16, maxMs: 19),
                 dnsServer: "192.168.0.1", dnsMs: 22 + wobble * 6, tcpDirectMs: 14, httpMs: 110 + wobble * 90,
-                wifi: wifi
+                wifi: wifi,
+                router: RouterStats(wanDownKBps: 18 + wobble * 40, wanUpKBps: 5 + wobble * 8, clients: 2, wanUptime: 8500, wanStatus: "1310007")
             )
             if (35...37).contains(ago) || (1300...1303).contains(ago) { // Wi-Fi drop
                 s.gw = dead; s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil; s.dnsMs = nil; s.httpMs = nil

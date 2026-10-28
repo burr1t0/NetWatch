@@ -289,6 +289,45 @@ struct WifiRow: View {
     }
 }
 
+/// What the router says about itself: how much it is moving, how many devices are on it, how long the provider link has held.
+/// Shown only when the router can be read (Tenda), so on other networks the widget simply has one row less.
+struct RouterRow: View {
+    let stats: RouterStats
+
+    private func speed(_ kbps: Double?) -> String {
+        guard let kbps else { return "—" }
+        return kbps >= 1024 ? String(format: "%.1f МБ/с", kbps / 1024) : String(format: "%.0f КБ/с", kbps)
+    }
+
+    private func held(_ seconds: Int) -> String {
+        seconds >= 86_400 ? "\(seconds / 86_400) дн" : (seconds >= 3600 ? "\(seconds / 3600) ч \(seconds % 3600 / 60) мин" : "\(seconds / 60) мин")
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wifi.router")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.accent)
+            Text("↓ \(speed(stats.wanDownKBps))  ↑ \(speed(stats.wanUpKBps))")
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(Theme.text)
+            Spacer()
+            Text(rightSide)
+                .font(.system(size: 11))
+                .foregroundStyle(stats.reconnected == true ? Theme.warn : Theme.muted)
+                .lineLimit(1)
+        }
+    }
+
+    private var rightSide: String {
+        var parts: [String] = []
+        if let c = stats.clients { parts.append("устр.: \(c)") }
+        if let u = stats.wanUptime { parts.append("связь \(held(u))") }
+        return parts.joined(separator: " · ")
+    }
+}
+
 struct IncidentsList: View {
     private let style = RenderStyle()
     let incidents: [Incident]
