@@ -28,9 +28,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showWindow() {
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(refresher: refresher, notifier: notifier)))
+            let makeView = { SettingsView(refresher: self.refresher, notifier: self.notifier) }
+            // Let SwiftUI size the window and AppKit can end up in a layout loop ("needs another Update Constraints pass"),
+            // which aborts the app the moment the window opens. So: measure the content once, off-window, and fix the size.
+            let size = NSHostingView(rootView: makeView()).fittingSize
+            let host = NSHostingController(rootView: makeView())
+            host.sizingOptions = []
+
+            let w = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+            w.contentViewController = host
+            w.setContentSize(size)
             w.title = "NetWatch"
-            w.styleMask = [.titled, .closable, .miniaturizable]
             w.isReleasedWhenClosed = false
             w.center()
             window = w

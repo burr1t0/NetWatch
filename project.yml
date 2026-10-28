@@ -41,6 +41,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.egor.netwatch
         GENERATE_INFOPLIST_FILE: NO
+        # Regenerate the artwork with: swift run netwatch-icon App/Assets.xcassets/AppIcon.appiconset
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
   NetWatchWidget:
     type: app-extension

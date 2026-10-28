@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "NetWatchUI", targets: ["NetWatchUI"]),
         .executable(name: "netwatchd", targets: ["netwatchd"]),
         .executable(name: "netwatch-preview", targets: ["netwatch-preview"]),
+        .executable(name: "netwatch-icon", targets: ["netwatch-icon"]),
     ],
     targets: [
         .target(name: "NetWatchCore"),
@@ -16,6 +17,8 @@ let package = Package(
         .executableTarget(name: "netwatchd", dependencies: ["NetWatchCore"]),
         // Renders the widget views to PNG, so layout can be checked without Notification Center.
         .executableTarget(name: "netwatch-preview", dependencies: ["NetWatchCore", "NetWatchUI"]),
+        // Draws the app icon, so the artwork is reproducible from code instead of a binary nobody can edit.
+        .executableTarget(name: "netwatch-icon", dependencies: ["NetWatchUI"]),
         .testTarget(name: "NetWatchCoreTests", dependencies: ["NetWatchCore"]),
     ]
 )

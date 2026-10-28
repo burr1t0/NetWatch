@@ -42,6 +42,7 @@ scripts/install-app.sh    # приложение + виджет → ~/Applicatio
 
 - `project.yml` — описание проекта Xcode (`NetWatch.xcodeproj` генерируется и в git не хранится).
 - `Sources/NetWatchUI` — экраны виджета; `swift run netwatch-preview build/previews` рисует их в PNG без WidgetKit.
+- Иконка приложения рисуется кодом (`Sources/netwatch-icon`): `swift run netwatch-icon App/Assets.xcassets/AppIcon.appiconset`.
 - Виджет работает в песочнице и читает лог агента через узкое разрешение «только чтение»
   (`com.apple.security.temporary-exception.files.home-relative-path.read-only`). Для App Store такое не подходит, для личной установки — да.
 - Само расширение обновляется системой по бюджету, поэтому приложение-хозяин следит за логом и просит обновление
