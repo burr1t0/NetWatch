@@ -1,11 +1,46 @@
 import Foundation
 import NetWatchCore
 
-/// Synthetic 24 hours of data with a few outages, for widget placeholders and PNG previews.
+/// Synthetic data for widget placeholders, PNG previews and the README animations. Nothing here comes from a real network.
 public enum Mock {
-    public static func snapshot(now: Date = Date(), current: Verdict = .ok, days: Int = 1, range: StatsRange = .hour) -> WidgetSnapshot {
+    /// A stretch of time during which the network is in the given state.
+    public struct Outage {
+        public var start: Date
+        public var end: Date
+        public var verdict: Verdict
+
+        public init(start: Date, end: Date, verdict: Verdict) {
+            self.start = start
+            self.end = end
+            self.verdict = verdict
+        }
+    }
+
+    /// - Parameters:
+    ///   - current: state of the last two minutes.
+    ///   - events: a few canned outages placed at fixed "minutes ago" offsets. Switch it off for animations, where such events
+    ///     would stay put while the time moves on instead of scrolling away.
+    ///   - outages: problems at absolute times, which scroll naturally as `now` advances.
+    public static func snapshot(now: Date = Date(), current: Verdict = .ok, days: Int = 1, range: StatsRange = .hour,
+                                events: Bool = true, outages: [Outage] = []) -> WidgetSnapshot {
         let dead = Probe(sent: 3, received: 0)
         let wifi = WiFiInfo(interface: "en0", rssi: -37, noise: -94, txRateMbps: 433, channel: 56, band: "5GHz", isDFS: true)
+
+        func apply(_ verdict: Verdict, to s: inout Sample) {
+            switch verdict {
+            case .ok: break
+            case .degraded:
+                s.gw = Probe(sent: 3, received: 3, avgMs: 85, maxMs: 90)
+                s.direct = Probe(sent: 3, received: 3, avgMs: 110, maxMs: 120)
+                s.direct2 = Probe(sent: 3, received: 3, avgMs: 118, maxMs: 125)
+            case .dns: s.dnsMs = nil
+            case .vpn: s.httpMs = nil
+            case .isp: s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil
+            case .wifiOrRouter: s.gw = dead; s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil; s.dnsMs = nil; s.httpMs = nil
+            case .noLink: s.gateway = nil
+            }
+        }
+
         var samples: [Sample] = []
         var t = now.addingTimeInterval(-Double(days) * 86_400)
         var n = 0
@@ -22,28 +57,19 @@ public enum Mock {
                 wifi: wifi,
                 router: RouterStats(wanDownKBps: 18 + wobble * 40, wanUpKBps: 5 + wobble * 8, clients: 2, wanUptime: 8500, wanStatus: "1310007")
             )
-            if (35...37).contains(ago) || (1300...1303).contains(ago) { // Wi-Fi drop
-                s.gw = dead; s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil; s.dnsMs = nil; s.httpMs = nil
-            }
-            if (18...20).contains(ago) { // latency spike on both targets, otherwise the best-of-two hides it
-                s.direct = Probe(sent: 3, received: 3, avgMs: 85, maxMs: 120)
-                s.direct2 = Probe(sent: 3, received: 3, avgMs: 92, maxMs: 130)
-            }
-            if (300...303).contains(ago) || (4000...4004).contains(ago) { s.dnsMs = nil } // DNS outage
-            if (7300...7310).contains(ago) { s.direct = Probe(sent: 3, received: 3, avgMs: 140, maxMs: 200); s.direct2 = s.direct } // slow evening
-            if (900...904).contains(ago) { s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil } // provider outage
-
-            if ago < 2 {
-                switch current {
-                case .ok: break
-                case .degraded: s.gw = Probe(sent: 3, received: 3, avgMs: 85, maxMs: 90)
-                case .dns: s.dnsMs = nil
-                case .vpn: s.httpMs = nil
-                case .isp: s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil
-                case .wifiOrRouter: s.gw = dead; s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil
-                case .noLink: s.gateway = nil
+            if events {
+                if (35...37).contains(ago) || (1300...1303).contains(ago) { apply(.wifiOrRouter, to: &s) }
+                if (18...20).contains(ago) { // latency spike on both targets, otherwise the best-of-two hides it
+                    s.direct = Probe(sent: 3, received: 3, avgMs: 85, maxMs: 120)
+                    s.direct2 = Probe(sent: 3, received: 3, avgMs: 92, maxMs: 130)
                 }
+                if (300...303).contains(ago) || (4000...4004).contains(ago) { apply(.dns, to: &s) }
+                if (7300...7310).contains(ago) { s.direct = Probe(sent: 3, received: 3, avgMs: 140, maxMs: 200); s.direct2 = s.direct } // slow evening
+                if (900...904).contains(ago) { apply(.isp, to: &s) }
             }
+            for o in outages where t >= o.start && t < o.end { apply(o.verdict, to: &s) }
+            if ago < 2 { apply(current, to: &s) }
+
             s.verdict = Diagnosis.verdict(for: s)
             samples.append(s)
             t = t.addingTimeInterval(60)

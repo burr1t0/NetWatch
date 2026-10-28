@@ -48,14 +48,17 @@ struct StatusHeader: View {
                 .shadow(color: style.full ? color.opacity(0.7) : .clear, radius: 4)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
+                // The period switch takes the right side, so a long headline shrinks a little instead of being cut off.
                 Text(s.headline)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Text(s.detail)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.muted)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 6)
             // The period switch lives here, above the graph's data, so it never hides a spike.
