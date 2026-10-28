@@ -26,9 +26,10 @@ struct NetWatchProvider: TimelineProvider {
     private func entries() -> [NetWatchEntry] {
         let now = Date()
         let samples = SampleStore().load(since: now.addingTimeInterval(-86_400))
+        let networks = NetworkRegistry().all()
         return [0, WidgetSnapshot.staleAfter + 20, 900].map { offset in
             let date = now.addingTimeInterval(offset)
-            return NetWatchEntry(date: date, snapshot: .make(samples: samples, now: date))
+            return NetWatchEntry(date: date, snapshot: .make(samples: samples, now: date, networks: networks))
         }
     }
 }

@@ -9,16 +9,29 @@ struct SettingsView: View {
     @ObservedObject var notifier: ProblemNotifier
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @AppStorage(ProblemNotifier.enabledKey) private var notify = true
+    @State private var networkName = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("NetWatch")
                 .font(.title2.bold())
 
-            WidgetFrame { NetWatchLargeView(snapshot: refresher.snapshot) }
-                .frame(width: WidgetSizes.large.width, height: WidgetSizes.large.height)
+            // The medium preview keeps the window short enough for a small laptop screen; the large one is a widget-only size.
+            WidgetFrame { NetWatchMediumView(snapshot: refresher.snapshot) }
+                .frame(width: WidgetSizes.medium.width, height: WidgetSizes.medium.height)
 
             agentStatus
+
+            HStack {
+                Text("Эта сеть:")
+                TextField("Название сети", text: $networkName)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { refresher.renameCurrentNetwork(to: networkName) }
+                    .disabled(refresher.snapshot.networkID == nil)
+            }
+            Text("Для каждой сети данные считаются отдельно. Назовите её, например, «Корпус А», и нажмите Return.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             Toggle("Запускать при входе в систему", isOn: Binding(
                 get: { launchAtLogin },
@@ -32,15 +45,10 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
 
             Toggle("Уведомлять о проблемах, которые длятся дольше минуты", isOn: $notify)
-            HStack(spacing: 10) {
-                Button("Проверить уведомление") { notifier.sendTest() }
-                    .disabled(!notify)
-                if notifier.authorization == .denied {
-                    Label("Уведомления выключены для NetWatch в Системных настройках", systemImage: "bell.slash")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.warn)
-                }
-            }
+            Button("Проверить уведомление") { notifier.sendTest() }
+                .disabled(!notify)
+            permissionRow
+                .frame(height: 36, alignment: .leading) // fixed height: the window is sized once, so this row must not change it
 
             HStack {
                 Button("Обновить виджет") { refresher.reloadNow() }
@@ -60,6 +68,37 @@ struct SettingsView: View {
             notifier.refreshStatus()
         }
         .onDisappear { refresher.setWindowVisible(false) }
+        // Follow the current network (also when the Mac moves to another one while the window is open), but never overwrite typing.
+        .onReceive(refresher.$snapshot) { snap in
+            if let name = snap.networkName, !NSApp.isActive || networkName.isEmpty { networkName = name }
+        }
+    }
+
+    @ViewBuilder
+    private var permissionRow: some View {
+        switch notifier.authorization {
+        case .denied:
+            HStack(spacing: 10) {
+                Label("Система не разрешает NetWatch показывать уведомления", systemImage: "bell.slash")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.warn)
+                Spacer(minLength: 0)
+                Button("Открыть настройки") { notifier.openSystemSettings() }
+            }
+        case .notDetermined:
+            HStack(spacing: 10) {
+                Text("Разрешение на уведомления ещё не запрошено.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button("Разрешить") {
+                    NSApp.activate(ignoringOtherApps: true) // the system prompt appears only for the active app
+                    notifier.requestAuthorization()
+                }
+            }
+        default:
+            Color.clear
+        }
     }
 
     @ViewBuilder

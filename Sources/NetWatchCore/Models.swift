@@ -131,14 +131,23 @@ public struct Sample: Codable, Sendable {
     public var gwBurst: [Int]?
     /// Heaviest network processes at the time of a problem, e.g. "Telegram 1.3 МБ/с".
     public var talkers: [String]?
+    /// Which network this was measured on, so a Mac that moves between campuses does not mix them up.
+    public var network: NetworkKey?
+    /// Set when this network is known to drop ICMP to the router / to the internet. Such probes say nothing either way.
+    public var gwIcmpFiltered: Bool?
+    public var externalIcmpFiltered: Bool?
 
     public init(
         t: Date = Date(), iface: String? = nil, gateway: String? = nil, vpn: Bool = false,
         gw: Probe? = nil, direct: Probe? = nil, direct2: Probe? = nil,
         dnsServer: String? = nil, dnsMs: Double? = nil, tcpDirectMs: Double? = nil, httpMs: Double? = nil,
         wifi: WiFiInfo? = nil, verdict: Verdict = .ok,
-        link: LinkStats? = nil, system: SystemStats? = nil, gwBurst: [Int]? = nil, talkers: [String]? = nil
+        link: LinkStats? = nil, system: SystemStats? = nil, gwBurst: [Int]? = nil, talkers: [String]? = nil,
+        network: NetworkKey? = nil, gwIcmpFiltered: Bool? = nil, externalIcmpFiltered: Bool? = nil
     ) {
+        self.network = network
+        self.gwIcmpFiltered = gwIcmpFiltered
+        self.externalIcmpFiltered = externalIcmpFiltered
         self.link = link
         self.system = system
         self.gwBurst = gwBurst
@@ -160,9 +169,9 @@ public struct Sample: Codable, Sendable {
 }
 
 public extension Sample {
-    /// Best (lowest) average RTT to the internet over the physical interface.
+    /// Best (lowest) average RTT to the internet over the physical interface. Where ICMP is dropped, the TCP handshake time stands in.
     var directRttMs: Double? {
-        [direct?.avgMs, direct2?.avgMs].compactMap { $0 }.min()
+        [direct?.avgMs, direct2?.avgMs].compactMap { $0 }.min() ?? tcpDirectMs
     }
 
     var summaryLine: String {

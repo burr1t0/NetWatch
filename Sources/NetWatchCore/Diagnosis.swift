@@ -21,19 +21,26 @@ public enum Diagnosis {
     public static func verdict(for s: Sample) -> Verdict {
         guard s.iface != nil, s.gateway != nil else { return .noLink }
 
+        // Campus and corporate networks often drop ICMP. Once that is learned (see Prober), the silent probes carry no information.
+        let gwFiltered = s.gwIcmpFiltered == true
+        let extFiltered = s.externalIcmpFiltered == true
+
         // The router only counts as "down" when nothing gets through it: packets reaching the internet prove it forwards.
-        let gwSilent = (s.gw?.loss ?? 1) >= 0.5
-        let internetDown = (s.direct?.loss ?? 1) >= 0.5 && (s.direct2?.loss ?? 1) >= 0.5 && s.tcpDirectMs == nil
+        let gwSilent = !gwFiltered && (s.gw?.loss ?? 1) >= 0.5
+        let icmpDown = (s.direct?.loss ?? 1) >= 0.5 && (s.direct2?.loss ?? 1) >= 0.5
+        // Without ICMP, a TCP handshake (or, failing that, the HTTPS check) is the evidence that the internet is there.
+        let reachable = s.tcpDirectMs != nil || (extFiltered && s.httpMs != nil)
+        let internetDown = (icmpDown || extFiltered) && !reachable
         if internetDown { return gwSilent ? .wifiOrRouter : .isp }
         if s.dnsServer != nil && s.dnsMs == nil { return .dns }
         if s.vpn && s.httpMs == nil { return .vpn }
 
         // A single lost packet is noise; flag only when more than a fifth of all echoes vanished.
-        let probes = [s.gw, s.direct, s.direct2].compactMap { $0 }
+        let probes = [gwFiltered ? nil : s.gw, extFiltered ? nil : s.direct, extFiltered ? nil : s.direct2].compactMap { $0 }
         let sent = probes.reduce(0) { $0 + $1.sent }
         let lost = probes.reduce(0) { $0 + $1.sent - $1.received }
         let lossy = sent > 0 && Double(lost) / Double(sent) > 0.2
-        let slow = (s.gw?.avgMs ?? 0) > 30
+        let slow = (gwFiltered ? 0 : (s.gw?.avgMs ?? 0)) > 30
             || (s.directRttMs ?? 0) > 150
             || (s.dnsMs ?? 0) > 300
             || (s.httpMs ?? 0) > 3000

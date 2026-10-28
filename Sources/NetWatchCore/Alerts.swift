@@ -35,8 +35,10 @@ public enum Alerts {
     private static let ongoingGap: TimeInterval = 90
 
     /// Decides whether the latest samples warrant a notification, and updates `state` accordingly.
-    public static func next(samples: [Sample], now: Date = Date(), state: inout AlertState) -> Alert? {
-        let recent = samples.filter { $0.t <= now && $0.t >= now.addingTimeInterval(-1800) }.sorted { $0.t < $1.t }
+    public static func next(samples: [Sample], now: Date = Date(), state: inout AlertState, networks: [KnownNetwork] = []) -> Alert? {
+        let window = samples.filter { $0.t <= now && $0.t >= now.addingTimeInterval(-1800) }.sorted { $0.t < $1.t }
+        // Only the network the Mac is on now: an incident on the campus it just left is not news here.
+        let recent = Networks.currentOnly(window, known: networks).samples
         // No fresh data means the agent is not running: say nothing rather than guess.
         guard let latest = recent.last, now.timeIntervalSince(latest.t) <= WidgetSnapshot.staleAfter else { return nil }
 
@@ -46,7 +48,7 @@ public enum Alerts {
             if let prev = state.lastProblemAlert, now.timeIntervalSince(prev) < minGapBetweenAlerts { return nil }
             state.notifiedSince = last.start
             state.lastProblemAlert = now
-            return problem(last, recent: recent, now: now)
+            return problem(last, recent: recent, now: now, networks: networks)
         }
 
         guard let since = state.notifiedSince else { return nil }
@@ -55,9 +57,10 @@ public enum Alerts {
         return Alert(kind: .recovered, title: "NetWatch · связь восстановилась", body: "Сеть снова в порядке.\(lasted)")
     }
 
-    private static func problem(_ incident: Incident, recent: [Sample], now: Date) -> Alert {
-        let snapshot = WidgetSnapshot.make(samples: recent, now: now)
+    private static func problem(_ incident: Incident, recent: [Sample], now: Date, networks: [KnownNetwork]) -> Alert {
+        let snapshot = WidgetSnapshot.make(samples: recent, now: now, networks: networks)
         var lines = [snapshot.detail]
+        if let name = snapshot.networkName { lines.append("Сеть: \(name)") }
 
         // Name the likeliest cause when the router itself was slow and context was recorded.
         var counts: [SpikeCause: Int] = [:]

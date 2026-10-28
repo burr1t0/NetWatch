@@ -62,14 +62,32 @@ public enum Report {
         return lines
     }
 
-    public static func text(samples: [Sample], since: Date, now: Date = Date()) -> String {
+    /// One report per network, most recently used first. `only` narrows it to a network by id or part of its name.
+    /// Networks are never mixed: a hotspot and a campus network have nothing to say about each other.
+    public static func text(samples: [Sample], since: Date, now: Date = Date(), networks: [KnownNetwork] = [], only: String? = nil) -> String {
+        var groups = Networks.partition(samples, known: networks)
+        if let only = only?.lowercased(), !only.isEmpty {
+            groups = groups.filter { $0.id.lowercased() == only || Networks.name(for: $0.id, known: networks).lowercased().contains(only) }
+        }
+        guard !groups.isEmpty else {
+            return only == nil ? "Нет данных за выбранный период. Запустите: netwatchd run" : "Нет данных по этой сети. Список сетей: netwatchd networks"
+        }
+        let sections = groups.map { group -> String in
+            var title = "NetWatch — отчёт · сеть «\(Networks.name(for: group.id, known: networks))»"
+            if let gw = Networks.gateway(for: group.id, known: networks, samples: group.samples) { title += " (роутер \(gw))" }
+            return section(samples: group.samples, since: since, now: now, title: title)
+        }
+        return sections.joined(separator: "\n\n" + String(repeating: "━", count: 48) + "\n\n")
+    }
+
+    private static func section(samples: [Sample], since: Date, now: Date, title: String) -> String {
         guard !samples.isEmpty else { return "Нет данных за выбранный период. Запустите: netwatchd run" }
         let s = samples.sorted { $0.t < $1.t }
         let w = weights(s)
         let observed = w.reduce(0, +)
         var out: [String] = []
 
-        out.append("NetWatch — отчёт")
+        out.append(title)
         out.append("Период: \(clock(since, date: true)) — \(clock(now, date: true)), замеров: \(s.count), наблюдали \(dur(observed)) (\(Int(observed / max(1, now.timeIntervalSince(since)) * 100))% периода)")
 
         var byVerdict: [Verdict: Double] = [:]

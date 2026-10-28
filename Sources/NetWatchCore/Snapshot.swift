@@ -27,9 +27,14 @@ public struct WidgetSnapshot: Sendable {
     public var incidents: [Incident]
     /// Share of the last hour spent in the OK state, 0...1.
     public var availability: Double?
+    /// The network everything above refers to: the one the newest sample was taken on.
+    public var networkID: String?
+    public var networkName: String?
 
-    public static func make(samples: [Sample], now: Date = Date()) -> WidgetSnapshot {
-        let sorted = samples.filter { $0.t <= now }.sorted { $0.t < $1.t }
+    /// Builds the picture for the network the Mac is on now; samples from other networks are left out.
+    public static func make(samples: [Sample], now: Date = Date(), networks: [KnownNetwork] = []) -> WidgetSnapshot {
+        let all = samples.filter { $0.t <= now }.sorted { $0.t < $1.t }
+        let (sorted, networkID) = Networks.currentOnly(all, known: networks)
         let latest = sorted.last
         let stale = latest.map { now.timeIntervalSince($0.t) > staleAfter } ?? true
 
@@ -57,7 +62,9 @@ public struct WidgetSnapshot: Sendable {
             status: stale ? nil : latest?.verdict,
             headline: headline, detail: detail, buckets: buckets,
             incidents: Array(Diagnosis.incidents(from: sorted).reversed().prefix(4)),
-            availability: availability
+            availability: availability,
+            networkID: networkID,
+            networkName: networkID.map { Networks.name(for: $0, known: networks) }
         )
     }
 

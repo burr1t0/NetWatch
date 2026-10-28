@@ -45,6 +45,34 @@ final class DiagnosisTests: XCTestCase {
         XCTAssertEqual(Diagnosis.verdict(for: s), .degraded)
     }
 
+    // MARK: Networks that drop ICMP (campus, corporate)
+
+    func testDroppedIcmpToTheInternetIsNotAProblemOnceLearned() {
+        var s = healthy(); s.direct = dead; s.direct2 = dead; s.externalIcmpFiltered = true
+        XCTAssertEqual(Diagnosis.verdict(for: s), .ok)
+        XCTAssertEqual(s.directRttMs, 15, "the TCP handshake time stands in for the missing ICMP round trip")
+    }
+
+    func testDroppedIcmpBeforeItIsLearnedStillCountsAsLoss() {
+        var s = healthy(); s.direct = dead; s.direct2 = dead
+        XCTAssertEqual(Diagnosis.verdict(for: s), .degraded)
+    }
+
+    func testSilentRouterIsIgnoredWhereItNeverAnswers() {
+        var s = healthy(); s.gw = dead; s.gwIcmpFiltered = true
+        XCTAssertEqual(Diagnosis.verdict(for: s), .ok)
+    }
+
+    func testInternetIsStillDownWithoutIcmpWhenTcpAndHttpFail() {
+        var s = healthy(); s.direct = dead; s.direct2 = dead; s.externalIcmpFiltered = true; s.tcpDirectMs = nil; s.httpMs = nil
+        XCTAssertEqual(Diagnosis.verdict(for: s), .isp)
+    }
+
+    func testHttpsKeepsTheInternetAliveWhenTcpToTheProbeIsBlocked() {
+        var s = healthy(); s.direct = dead; s.direct2 = dead; s.externalIcmpFiltered = true; s.tcpDirectMs = nil
+        XCTAssertEqual(Diagnosis.verdict(for: s), .ok)
+    }
+
     func testDnsFailure() {
         var s = healthy(); s.dnsMs = nil
         XCTAssertEqual(Diagnosis.verdict(for: s), .dns)

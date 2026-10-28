@@ -9,6 +9,7 @@ final class WidgetRefresher: ObservableObject {
     @Published private(set) var snapshot = WidgetSnapshot.make(samples: [])
 
     private let store = SampleStore()
+    private let registry = NetworkRegistry()
     private let notifier: ProblemNotifier
     private let queue = DispatchQueue(label: "netwatch.refresher")
     private var timer: DispatchSourceTimer?
@@ -35,6 +36,16 @@ final class WidgetRefresher: ObservableObject {
         }
     }
 
+    /// Gives the network the Mac is on now a name of the user's choosing and refreshes the widget with it.
+    func renameCurrentNetwork(to name: String) {
+        queue.async {
+            guard let id = self.snapshot.networkID else { return }
+            self.registry.rename(id: id, to: name)
+            WidgetCenter.shared.reloadAllTimelines()
+            self.publishSnapshot()
+        }
+    }
+
     func reloadNow() {
         queue.async {
             WidgetCenter.shared.reloadAllTimelines()
@@ -53,13 +64,13 @@ final class WidgetRefresher: ObservableObject {
             lastReload = now
             lastVerdict = last.verdict
         }
-        notifier.evaluate(recent)
+        notifier.evaluate(recent, networks: registry.all())
         if windowVisible { publishSnapshot() }
     }
 
     private func publishSnapshot() {
         let now = Date()
-        let snap = WidgetSnapshot.make(samples: store.load(since: now.addingTimeInterval(-86_400)), now: now)
+        let snap = WidgetSnapshot.make(samples: store.load(since: now.addingTimeInterval(-86_400)), now: now, networks: registry.all())
         DispatchQueue.main.async { self.snapshot = snap }
     }
 }

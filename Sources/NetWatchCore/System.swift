@@ -48,6 +48,19 @@ enum SystemInfo {
         return env
     }
 
+    /// MAC address of the router from the ARP cache, normalised to lowercase with two digits per byte.
+    /// Only read when the router changes, so spawning `arp` costs nothing noticeable.
+    static func gatewayMAC(_ gateway: String) -> String? {
+        guard let out = Shell.run("/usr/sbin/arp", ["-n", gateway], timeout: 3),
+              let r = out.range(of: " at ") else { return nil }
+        // "? (192.168.0.1) at 2:0:0:0:0:1 on en0 ..." — an unresolved entry says "(incomplete)" and fails the 6-part check.
+        let rest = out[r.upperBound...]
+        guard let end = rest.firstIndex(of: " ") else { return nil }
+        let parts = rest[..<end].split(separator: ":")
+        guard parts.count == 6 else { return nil }
+        return parts.map { $0.count == 1 ? "0\($0)" : String($0) }.joined(separator: ":").lowercased()
+    }
+
     static func wifi() -> WiFiInfo? {
         guard let i = CWWiFiClient.shared().interface(), let name = i.interfaceName,
               let ch = i.wlanChannel(), i.rssiValue() != 0 else { return nil }

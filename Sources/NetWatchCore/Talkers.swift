@@ -7,7 +7,7 @@ enum Talkers {
     private static let relays: Set<String> = ["Tunnel", "mDNSResponder", "netwatchd", "NetWatch", "nettop", "launchd", "kernel_task"]
 
     static func top(_ count: Int = 3, minBytesPerSecond: Double = 20_000) -> [String]? {
-        guard let out = run("/usr/bin/nettop", ["-P", "-d", "-L", "2", "-s", "1", "-x", "-J", "bytes_in,bytes_out"], timeout: 15) else { return nil }
+        guard let out = Shell.run("/usr/bin/nettop", ["-P", "-d", "-L", "2", "-s", "1", "-x", "-J", "bytes_in,bytes_out"], timeout: 15) else { return nil }
         return parse(out, count: count, minBytesPerSecond: minBytesPerSecond)
     }
 
@@ -28,31 +28,5 @@ enum Talkers {
         }
         let top = rows.filter { $0.bytes >= minBytesPerSecond }.sorted { $0.bytes > $1.bytes }.prefix(count)
         return top.map { $0.bytes >= 1e6 ? String(format: "%@ %.1f МБ/с", $0.name, $0.bytes / 1e6) : String(format: "%@ %.0f КБ/с", $0.name, $0.bytes / 1e3) }
-    }
-
-    private static func run(_ path: String, _ args: [String], timeout: TimeInterval) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = args
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do { try process.run() } catch { return nil }
-
-        // Drain the pipe on another thread so a chatty child cannot block on a full buffer.
-        var data = Data()
-        let done = DispatchGroup()
-        done.enter()
-        DispatchQueue.global(qos: .utility).async {
-            data = pipe.fileHandleForReading.readDataToEndOfFile()
-            done.leave()
-        }
-        if done.wait(timeout: .now() + timeout) == .timedOut {
-            process.terminate()
-            _ = done.wait(timeout: .now() + 1)
-            return nil
-        }
-        process.waitUntilExit()
-        return String(data: data, encoding: .utf8)
     }
 }

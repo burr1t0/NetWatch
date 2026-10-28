@@ -13,11 +13,21 @@ public final class Prober {
     /// Collect the problem-time evidence (echo burst, top processes) even when everything looks fine.
     public var forceContext = false
 
+    private let registry: NetworkRegistry
     private var lastCounters: (at: UInt64, stats: [String: SystemInfo.IfCounters])?
     private var lastBurst = Date.distantPast
     private var lastTalkers = Date.distantPast
+    private var routerMAC: (gateway: String, mac: String?, checkedAt: Date)?
+    private var lastNetworkID: String?
+    private var gwSilentStreak = 0
+    private var externalSilentStreak = 0
 
-    public init() {}
+    /// How many rounds in a row ICMP must stay silent while the internet works before the network is marked as filtering it.
+    private static let filterStreak = 4
+
+    public init(registry: NetworkRegistry = NetworkRegistry()) {
+        self.registry = registry
+    }
 
     public func sample() async -> Sample {
         let env = SystemInfo.environment()
@@ -48,10 +58,57 @@ public final class Prober {
         s.tcpDirectMs = await tcp
         (s.dnsServer, s.dnsMs) = await dns
         s.httpMs = await http
+
+        // After the probes, so the router has just been talked to and is certain to be in the ARP cache.
+        let key = networkKey(gateway: gateway)
+        s.network = key
+        learnFilters(&s, known: registry.observe(key))
         s.verdict = Diagnosis.verdict(for: s)
 
         if s.verdict != .ok || forceContext { await addContext(to: &s, gateway: gateway, iface: iface) }
         return s
+    }
+
+    // MARK: Network identity
+
+    private func networkKey(gateway: String) -> NetworkKey {
+        let now = Date()
+        if let c = routerMAC, c.gateway == gateway, c.mac != nil || now.timeIntervalSince(c.checkedAt) < 300 {
+            return NetworkKey.make(gateway: gateway, mac: c.mac)
+        }
+        let mac = SystemInfo.gatewayMAC(gateway)
+        routerMAC = (gateway, mac, now)
+        return NetworkKey.make(gateway: gateway, mac: mac)
+    }
+
+    /// Notices networks that silently drop ICMP: four rounds in a row where the internet demonstrably works
+    /// but the router (or every internet target) never answers a ping. The finding is stored with the network,
+    /// so it applies immediately the next time the Mac joins it, and is withdrawn as soon as a ping gets an answer.
+    private func learnFilters(_ s: inout Sample, known: KnownNetwork) {
+        if lastNetworkID != known.id {
+            lastNetworkID = known.id
+            gwSilentStreak = 0
+            externalSilentStreak = 0
+        }
+        let alive = s.tcpDirectMs != nil || s.httpMs != nil
+        let gwAnswered = (s.gw?.received ?? 0) > 0
+        let externalAnswered = (s.direct?.received ?? 0) > 0 || (s.direct2?.received ?? 0) > 0
+        gwSilentStreak = alive && !gwAnswered ? gwSilentStreak + 1 : 0
+        externalSilentStreak = alive && !externalAnswered ? externalSilentStreak + 1 : 0
+
+        var gwFiltered = known.gatewayIcmpFiltered == true
+        var externalFiltered = known.externalIcmpFiltered == true
+        if gwAnswered { gwFiltered = false } else if gwSilentStreak >= Self.filterStreak { gwFiltered = true }
+        if externalAnswered { externalFiltered = false } else if externalSilentStreak >= Self.filterStreak { externalFiltered = true }
+
+        if gwFiltered != (known.gatewayIcmpFiltered == true) || externalFiltered != (known.externalIcmpFiltered == true) {
+            registry.update(id: known.id) {
+                $0.gatewayIcmpFiltered = gwFiltered
+                $0.externalIcmpFiltered = externalFiltered
+            }
+        }
+        s.gwIcmpFiltered = gwFiltered ? true : nil
+        s.externalIcmpFiltered = externalFiltered ? true : nil
     }
 
     // MARK: Context
@@ -92,6 +149,8 @@ public final class Prober {
         s.talkers = await talkers
     }
 
+    /// Fetches Apple's connectivity page and checks its content. A captive portal or a proxy answers with 200 and its own
+    /// page, which is not internet access, so the status code alone proves nothing.
     private func httpProbe() async -> Double? {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 5
@@ -101,8 +160,9 @@ public final class Prober {
 
         let t0 = Clock.nowNs()
         do {
-            let (_, response) = try await session.data(from: testURL)
-            guard let code = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(code) else { return nil }
+            let (data, response) = try await session.data(from: testURL)
+            guard let code = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(code),
+                  String(decoding: data.prefix(2000), as: UTF8.self).contains("Success") else { return nil }
             return Double(Clock.nowNs() - t0) / 1_000_000
         } catch {
             return nil

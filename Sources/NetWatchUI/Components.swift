@@ -52,9 +52,11 @@ struct StatusHeader: View {
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(style.full ? (a > 0.99 ? Theme.ok : (a > 0.95 ? Theme.warn : Theme.bad)) : Theme.text)
-                    Text("за час")
+                    Text(s.networkName.map { "за час · \($0)" } ?? "за час")
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                        .frame(maxWidth: 120, alignment: .trailing)
                 }
             }
         }

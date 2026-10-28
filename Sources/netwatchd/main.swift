@@ -9,7 +9,9 @@ func usage() -> Never {
 
       netwatchd run [--base N] [--fast N]   фоновый сбор замеров (по умолчанию 30 с / 3 с при проблемах)
       netwatchd once [--context]            один замер; --context добавляет серию до роутера и список «кто грузит сеть»
-      netwatchd report [--hours N]          отчёт за последние N часов (по умолчанию 24)
+      netwatchd report [--hours N] [--network ИМЯ]   отчёт за последние N часов (по умолчанию 24), по каждой сети отдельно
+      netwatchd networks                    сети, в которых бывал Mac
+      netwatchd name <id|current> <имя>     назвать сеть, например: netwatchd name current Корпус А
 
     Лог: \(SampleStore.defaultDir.path)
     """)
@@ -47,7 +49,40 @@ case "once":
 case "report":
     let hours = option("--hours", in: args) ?? 24
     let since = Date().addingTimeInterval(-hours * 3600)
-    print(Report.text(samples: store.load(since: since), since: since))
+    let only = args.firstIndex(of: "--network").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    print(Report.text(samples: store.load(since: since), since: since, networks: NetworkRegistry().all(), only: only))
+
+case "networks":
+    let known = NetworkRegistry().all()
+    let since = Date().addingTimeInterval(-7 * 86_400)
+    let groups = Networks.partition(store.load(since: since), known: known)
+    if groups.isEmpty { print("За последние 7 дней замеров нет.") }
+    let f = DateFormatter()
+    f.dateFormat = "dd.MM HH:mm"
+    for g in groups {
+        let gw = Networks.gateway(for: g.id, known: known, samples: g.samples) ?? "—"
+        let flags = known.first { $0.id == g.id }.map { k -> String in
+            [k.gatewayIcmpFiltered == true ? "ICMP до роутера закрыт" : nil, k.externalIcmpFiltered == true ? "ICMP наружу закрыт" : nil]
+                .compactMap { $0 }.joined(separator: ", ")
+        } ?? ""
+        print("\(g.id.padding(toLength: 10, withPad: " ", startingAt: 0)) \(Networks.name(for: g.id, known: known).padding(toLength: 22, withPad: " ", startingAt: 0)) роутер \(gw.padding(toLength: 15, withPad: " ", startingAt: 0)) замеров \(g.samples.count), последний \(f.string(from: g.samples.last?.t ?? Date()))\(flags.isEmpty ? "" : "  [\(flags)]")")
+    }
+
+case "name":
+    guard args.count >= 3 else { usage() }
+    let registry = NetworkRegistry()
+    let known = registry.all()
+    var id = args[1]
+    if id == "current" {
+        let recent = store.load(since: Date().addingTimeInterval(-3600))
+        id = Networks.currentOnly(recent, known: known).id ?? ""
+    }
+    guard known.contains(where: { $0.id == id }) else {
+        print("Такой сети нет в списке. Посмотрите: netwatchd networks")
+        exit(1)
+    }
+    registry.rename(id: id, to: args.dropFirst(2).joined(separator: " "))
+    print("Готово: \(id) → \(args.dropFirst(2).joined(separator: " "))")
 
 case "run":
     let monitor = Monitor(
