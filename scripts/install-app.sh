@@ -5,6 +5,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 APP_DIR="$HOME/Applications"
+# The ".noindex" suffix keeps Spotlight out of the build folder; otherwise the freshly built copy shows up
+# next to the installed one and every search for the app finds two.
+DERIVED="build.noindex/xcode"
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
 # The signing team comes from the Apple Development certificate in the keychain, so no personal ID lives in the repo.
 # Override with NETWATCH_TEAM=<Team ID> if you have several certificates.
@@ -18,7 +22,7 @@ fi
 xcodegen generate
 mkdir -p build
 if ! xcodebuild -project NetWatch.xcodeproj -scheme NetWatch -configuration Release \
-    -derivedDataPath build/xcode -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM" build > build/xcodebuild.log 2>&1; then
+    -derivedDataPath "$DERIVED" -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM" build > build/xcodebuild.log 2>&1; then
     grep -E "error:" build/xcodebuild.log | head -10 >&2
     echo "Сборка не удалась, полный лог: build/xcodebuild.log" >&2
     exit 1
@@ -28,9 +32,12 @@ tail -1 build/xcodebuild.log
 pkill -x NetWatch 2>/dev/null || true
 mkdir -p "$APP_DIR"
 rm -rf "$APP_DIR/NetWatch.app"
-cp -R build/xcode/Build/Products/Release/NetWatch.app "$APP_DIR/"
+BUILT="$DERIVED/Build/Products/Release/NetWatch.app"
+cp -R "$BUILT" "$APP_DIR/"
 
-# Make LaunchServices / PlugInKit notice the widget right away.
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_DIR/NetWatch.app"
+# Building registers the build-folder copy with LaunchServices; drop it so only the installed app is known,
+# then make LaunchServices / PlugInKit notice the installed one (and its widget) right away.
+"$LSREGISTER" -u "$BUILT" 2>/dev/null || true
+"$LSREGISTER" -f "$APP_DIR/NetWatch.app"
 open "$APP_DIR/NetWatch.app"
 echo "Готово: $APP_DIR/NetWatch.app"
