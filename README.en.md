@@ -1,40 +1,76 @@
-# NetWatch
+<p align="center"><img src="docs/icon.png" width="128" alt="NetWatch"></p>
 
-[🇷🇺 Русский](README.md) · 🇬🇧 English
+<h1 align="center">NetWatch</h1>
 
-Home network diagnostics for macOS. It answers "where does it break": Wi-Fi/router, provider, DNS or VPN.
+<p align="center">
+  <b>Where your internet breaks: Wi-Fi, provider, DNS or VPN.</b><br>
+  Home network diagnostics for macOS: a background agent, a desktop widget and a notification when something goes wrong.
+</p>
+
+<p align="center">
+  <a href="README.md">Русский</a> · English
+</p>
+
+<p align="center">
+  <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?logo=apple&logoColor=white">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-SwiftUI%20%2B%20WidgetKit-F05138?logo=swift&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
+
+<p align="center"><img src="docs/widget-incident-large.gif" width="408" alt="Large widget: a problem appears and clears"></p>
+
+---
+
+## What it is
+
+The internet "sometimes slows down", and it is unclear whose fault it is: the router, the provider or your own VPN. Every 30 seconds
+NetWatch checks each part of the path separately, records the results and tells you **where exactly** it breaks. A one-second glitch
+is not a problem, while repeated ones are merged into incidents with a likely cause.
 
 All measurements (except HTTPS) are bound to the physical interface (`en0`), so a VPN cannot distort them. HTTPS goes
 over the default route and shows what apps actually experience.
 
-License: [MIT](LICENSE).
+| Part | What it does |
+|---|---|
+| <img src="docs/icons/status.svg" width="22" height="22" align="absmiddle"> **Diagnosis** | Wi-Fi/router, provider, DNS and VPN are told apart; short glitches are not counted |
+| <img src="docs/icons/widget.svg" width="22" height="22" align="absmiddle"> **Widget** | Medium and large: a colored status, a graph with an hour · day · week switch, a click opens the app |
+| <img src="docs/icons/notifications.svg" width="22" height="22" align="absmiddle"> **Notifications** | About a problem that lasts longer than a minute, with the likely cause |
+| <img src="docs/icons/causes.svg" width="22" height="22" align="absmiddle"> **Causes of spikes** | This Mac's own traffic, AWDL (AirDrop and Handoff), power saving, CPU load, other devices |
+| <img src="docs/icons/networks.svg" width="22" height="22" align="absmiddle"> **Networks** | Home, campus and a phone hotspot are counted separately; networks that drop ping are recognized automatically |
+| <img src="docs/icons/router.svg" width="22" height="22" align="absmiddle"> **Tenda router** | Traffic through the router, number of devices, how long the provider connection has held; read without a password, nothing is written |
 
-## Features
+Frugal: one measurement every 30 s, faster only while there is a problem, slower on battery. License: [MIT](LICENSE).
 
-- **Where it breaks.** Wi-Fi/router, provider, DNS and VPN are told apart. Short glitches are not counted as problems, while repeated ones are merged into incidents.
-- **A widget** in medium and large sizes: a colored status, a graph with an hour · day · week switch, and a click that opens the app.
-- **Notifications** about a problem that lasts longer than a minute, with the likely cause.
-- **Causes of latency spikes.** This Mac's own traffic, AWDL (AirDrop and Handoff), power saving, CPU load, other devices on the network.
-- **Every network on its own.** Home, campus and a phone hotspot are counted separately. Networks that drop ping are recognized automatically.
-- **Tenda router.** Traffic through the router, number of devices, how long the provider connection has held. The data is read without a password and nothing is ever written to the router.
-- **Frugal.** One measurement every 30 s, faster only while there is a problem, slower on battery.
+---
+
+## How it works
+
+1. **The agent** (`netwatchd`, launchd) measures in the background: router, two internet addresses, DNS, TCP, HTTPS.
+2. **Diagnosis** decides by rules what is wrong with the network and merges glitches into incidents. The log and 15-minute summaries stay on your Mac.
+3. **The widget and the app** read the log: they draw the status and the graph, and send a notification when a problem lasts.
+
+---
 
 ## What it looks like
 
 The animations are drawn in code from synthetic data (`scripts/make-gifs.sh`), so they contain nothing about a real network.
 
-**Graph period: hour, day, week.** The buttons in the widget header work right on the desktop.
+### <img src="docs/icons/widget.svg" width="24" height="24" align="absmiddle"> Graph period
 
-<img src="docs/widget-periods.gif" width="408" alt="Switching the graph period: hour, day, week">
+The buttons in the widget header work right on the desktop.
 
-**What a problem looks like.** The connection turns unstable (yellow), then nothing gets through the router (red),
+<p align="center"><img src="docs/widget-periods.gif" width="408" alt="Switching the graph period: hour, day, week"></p>
+
+### <img src="docs/icons/status.svg" width="24" height="24" align="absmiddle"> What a problem looks like
+
+The connection turns unstable (yellow), then nothing gets through the router (red),
 then everything recovers. The strip under the graph shows the state minute by minute.
 
-<img src="docs/widget-incident-medium.gif" width="408" alt="Medium widget: a problem appears and clears">
+<p align="center"><img src="docs/widget-incident-medium.gif" width="408" alt="Medium widget: a problem appears and clears"></p>
 
-The large widget adds Wi-Fi, router data and a list of incidents.
+The large widget (shown at the top) adds Wi-Fi, router data and a list of incidents.
 
-<img src="docs/widget-incident-large.gif" width="408" alt="Large widget: a problem appears and clears">
+---
 
 ## Requirements
 
@@ -65,7 +101,7 @@ swift build -c release
 
 Log: `~/Library/Application Support/NetWatch/samples-YYYY-MM-DD.jsonl` (kept for 30 days).
 
-## Widget
+## <img src="docs/icons/widget.svg" width="30" height="30" align="absmiddle"> Widget
 
 A medium and a large widget for the macOS widget panel: a colored status, four key numbers, a latency graph
 with a state strip, and the large one also shows Wi-Fi (channel, DFS, signal), router data and recent incidents.
@@ -89,7 +125,7 @@ To add it: right-click the desktop → "Edit Widgets" → NetWatch.
 - The system refreshes the extension on its own budget, so the host app watches the log and asks for a refresh
   when the state changes and once a minute. The app runs in the background: it has no Dock icon, and its window opens when you click the widget.
 
-## What counts as a problem
+## <img src="docs/icons/status.svg" width="30" height="30" align="absmiddle"> What counts as a problem
 
 | Verdict | Condition |
 |---|---|
