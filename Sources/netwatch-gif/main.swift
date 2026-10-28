@@ -48,6 +48,13 @@ func fileSize(_ url: URL) -> String {
     return String(format: "%.0f KB", Double(bytes) / 1024)
 }
 
+// A fixed moment in a fixed time zone: the clock times inside the animations say nothing about when or where they were
+// made, and the same input always gives the same files.
+setenv("TZ", "UTC", 1)
+tzset()
+NSTimeZone.resetSystemTimeZone()
+let now = ISO8601DateFormatter().date(from: "2026-03-12T18:40:00Z")!
+
 guard let outPath = CommandLine.arguments.dropFirst().first else {
     print("usage: netwatch-gif <output directory>")
     exit(64)
@@ -58,7 +65,6 @@ try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories:
 await MainActor.run {
     let large = WidgetSizes.large
     let medium = WidgetSizes.medium
-    let now = Date()
 
     // 1. The period switch: hour, day, week.
     var periods: [(CGImage, Double)] = []

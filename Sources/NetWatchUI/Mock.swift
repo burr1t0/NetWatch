@@ -24,7 +24,10 @@ public enum Mock {
     public static func snapshot(now: Date = Date(), current: Verdict = .ok, days: Int = 1, range: StatsRange = .hour,
                                 events: Bool = true, outages: [Outage] = []) -> WidgetSnapshot {
         let dead = Probe(sent: 3, received: 0)
-        let wifi = WiFiInfo(interface: "en0", rssi: -37, noise: -94, txRateMbps: 433, channel: 56, band: "5GHz", isDFS: true)
+        // Invented on purpose: nothing below is read from a real network, so it can never reveal anybody's setup.
+        let wifi = WiFiInfo(interface: "en0", rssi: -52, noise: -92, txRateMbps: 866, channel: 100, band: "5GHz", isDFS: true)
+        let key = NetworkKey(id: "demo", gateway: "192.168.1.1")
+        let known = [KnownNetwork(id: key.id, gateway: key.gateway, name: "Дом", customName: true, firstSeen: now, lastSeen: now)]
 
         func apply(_ verdict: Verdict, to s: inout Sample) {
             switch verdict {
@@ -49,13 +52,13 @@ public enum Mock {
             let ago = now.timeIntervalSince(t) / 60 // minutes
             let wobble = abs(sin(Double(n) * 0.7))
             var s = Sample(
-                t: t, iface: "en0", gateway: "192.168.0.1", vpn: true,
+                t: t, iface: "en0", gateway: key.gateway, vpn: true,
                 gw: Probe(sent: 3, received: 3, avgMs: 3 + wobble * 2, maxMs: 6),
                 direct: Probe(sent: 3, received: 3, avgMs: 12 + wobble * 4, maxMs: 20),
                 direct2: Probe(sent: 3, received: 3, avgMs: 16, maxMs: 19),
-                dnsServer: "192.168.0.1", dnsMs: 22 + wobble * 6, tcpDirectMs: 14, httpMs: 110 + wobble * 90,
-                wifi: wifi,
-                router: RouterStats(wanDownKBps: 18 + wobble * 40, wanUpKBps: 5 + wobble * 8, clients: 2, wanUptime: 8500, wanStatus: "1310007")
+                dnsServer: key.gateway, dnsMs: 22 + wobble * 6, tcpDirectMs: 14, httpMs: 110 + wobble * 90,
+                wifi: wifi, network: key,
+                router: RouterStats(wanDownKBps: 18 + wobble * 40, wanUpKBps: 5 + wobble * 8, clients: 4, wanUptime: 22_100, wanStatus: "0")
             )
             if events {
                 if (35...37).contains(ago) || (1300...1303).contains(ago) { apply(.wifiOrRouter, to: &s) }
@@ -77,6 +80,6 @@ public enum Mock {
         }
         // Like the real widget: raw samples for the last day, rollups for anything longer.
         let recent = samples.filter { $0.t >= now.addingTimeInterval(-86_400) }
-        return WidgetSnapshot.make(samples: recent, now: now, range: range, rollups: Rollups.build(samples, known: []))
+        return WidgetSnapshot.make(samples: recent, now: now, networks: known, range: range, rollups: Rollups.build(samples, known: known))
     }
 }

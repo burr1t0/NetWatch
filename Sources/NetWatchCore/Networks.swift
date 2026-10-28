@@ -31,6 +31,19 @@ public struct KnownNetwork: Codable, Equatable, Sendable {
     public var externalIcmpFiltered: Bool?
     /// "tenda" when the router's status page was recognised, "other" when it answered with something else; nil until checked.
     public var router: String?
+
+    public init(id: String, gateway: String, name: String, customName: Bool = false, firstSeen: Date, lastSeen: Date,
+                gatewayIcmpFiltered: Bool? = nil, externalIcmpFiltered: Bool? = nil, router: String? = nil) {
+        self.id = id
+        self.gateway = gateway
+        self.name = name
+        self.customName = customName
+        self.firstSeen = firstSeen
+        self.lastSeen = lastSeen
+        self.gatewayIcmpFiltered = gatewayIcmpFiltered
+        self.externalIcmpFiltered = externalIcmpFiltered
+        self.router = router
+    }
 }
 
 /// Known networks, kept in `networks.json` next to the sample log so the agent, the app and the widget all see the same names.

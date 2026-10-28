@@ -4,10 +4,10 @@ import XCTest
 final class RouterTests: XCTestCase {
     // Shaped like the router's replies, with invented values.
     private let routerStatus = #"""
-    {"clientNum":3,"wl24gName":"net","wanInfo":[{"wanStatus":"1310007","wanIp":"203.0.113.7","wanUploadSpeed":"5.48","wanDownloadSpeed":"26.42"}]}
+    {"clientNum":3,"wl24gName":"net","wanInfo":[{"wanStatus":"1000000","wanIp":"203.0.113.7","wanUploadSpeed":"5.48","wanDownloadSpeed":"26.42"}]}
     """#
     private let wanParameters = #"""
-    {"wanInfo":[{"wanType":"0","connectTime":"8380","connectStatus":"1310007"}]}
+    {"wanInfo":[{"wanType":"0","connectTime":"4200","connectStatus":"1000000"}]}
     """#
 
     func testRouterStatusIsParsedIncludingNumbersSentAsStrings() throws {
@@ -15,11 +15,11 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(stats.clients, 3)
         XCTAssertEqual(stats.wanDownKBps, 26.42)
         XCTAssertEqual(stats.wanUpKBps, 5.48)
-        XCTAssertEqual(stats.wanStatus, "1310007")
+        XCTAssertEqual(stats.wanStatus, "1000000")
     }
 
     func testWanUptimeIsReadFromTheOtherEndpoint() {
-        XCTAssertEqual(TendaClient.parseWanUptime(Data(wanParameters.utf8)), 8380)
+        XCTAssertEqual(TendaClient.parseWanUptime(Data(wanParameters.utf8)), 4200)
     }
 
     func testGarbageIsRejected() {
