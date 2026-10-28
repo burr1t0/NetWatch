@@ -1,0 +1,71 @@
+name: NetWatch
+options:
+  bundleIdPrefix: com.egor
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+# NetWatchCore / NetWatchUI come from Package.swift, so the daemon, the app and the widget share one codebase.
+packages:
+  NetWatch:
+    path: .
+
+settings:
+  base:
+    # DEVELOPMENT_TEAM is not stored here: scripts/install-app.sh takes it from the signing certificate (or NETWATCH_TEAM).
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: NO
+
+targets:
+  NetWatch:
+    type: application
+    platform: macOS
+    sources: [App]
+    dependencies:
+      - package: NetWatch
+        product: NetWatchCore
+      - package: NetWatch
+        product: NetWatchUI
+      - target: NetWatchWidget
+        embed: true
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: NetWatch
+        LSUIElement: true
+        LSMinimumSystemVersion: "15.0"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.egor.netwatch
+        GENERATE_INFOPLIST_FILE: NO
+
+  NetWatchWidget:
+    type: app-extension
+    platform: macOS
+    sources: [Widget]
+    dependencies:
+      - package: NetWatch
+        product: NetWatchCore
+      - package: NetWatch
+        product: NetWatchUI
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: NetWatch
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    # Widget extensions must be sandboxed. This narrow read-only exception lets it see the agent's log
+    # (a temporary exception is fine for a locally signed app; the App Store would not accept it).
+    entitlements:
+      path: Widget/NetWatchWidget.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.temporary-exception.files.home-relative-path.read-only:
+          - /Library/Application Support/NetWatch/
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.egor.netwatch.widget
+        GENERATE_INFOPLIST_FILE: NO
