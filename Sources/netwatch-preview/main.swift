@@ -35,6 +35,13 @@ await MainActor.run {
     save(NetWatchMediumView(snapshot: bad), size: WidgetSizes.medium, name: "medium-mock-bad")
     save(NetWatchLargeView(snapshot: Mock.snapshot(now: now, current: .degraded)), size: WidgetSizes.large, name: "large-mock-degraded")
 
+    let day = Mock.snapshot(now: now, days: 7, range: .day)
+    let week = Mock.snapshot(now: now, days: 7, range: .week)
+    save(NetWatchMediumView(snapshot: day), size: WidgetSizes.medium, name: "medium-mock-day")
+    save(NetWatchLargeView(snapshot: day), size: WidgetSizes.large, name: "large-mock-day")
+    save(NetWatchMediumView(snapshot: week), size: WidgetSizes.medium, name: "medium-mock-week")
+    save(NetWatchLargeView(snapshot: week), size: WidgetSizes.large, name: "large-mock-week")
+
     let stale = WidgetSnapshot.make(samples: [], now: now)
     save(NetWatchMediumView(snapshot: stale), size: WidgetSizes.medium, name: "medium-nodata")
 

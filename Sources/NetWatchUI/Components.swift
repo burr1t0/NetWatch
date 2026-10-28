@@ -1,7 +1,18 @@
 import SwiftUI
 import NetWatchCore
 
+/// Wraps a period label in whatever makes it tappable. Only the widget can do that (it needs an App Intent button),
+/// so the shared views take it as a closure; without one the pills are just a display.
+public typealias RangeButtonBuilder = (StatsRange, AnyView) -> AnyView
+
 enum Fmt {
+    static func when(_ d: Date, range: StatsRange) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ru_RU")
+        f.dateFormat = range == .week ? "E HH:mm" : "HH:mm"
+        return f.string(from: d)
+    }
+
     static func ms(_ v: Double?) -> String {
         guard let v else { return "—" }
         return v < 10 ? String(format: "%.1f мс", v) : String(format: "%.0f мс", v)
@@ -26,6 +37,7 @@ enum Fmt {
 struct StatusHeader: View {
     private let style = RenderStyle()
     let s: WidgetSnapshot
+    var rangeButton: RangeButtonBuilder?
     private var color: Color { s.status?.tint(fullColor: style.full) ?? Theme.unknown }
 
     var body: some View {
@@ -46,18 +58,15 @@ struct StatusHeader: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 6)
-            if let a = s.availability {
-                VStack(alignment: .trailing, spacing: 1) {
+            // The period switch lives here, above the graph's data, so it never hides a spike.
+            VStack(alignment: .trailing, spacing: 3) {
+                if let a = s.availability {
                     Text(String(format: "%.1f%%", a * 100))
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(style.full ? (a > 0.99 ? Theme.ok : (a > 0.95 ? Theme.warn : Theme.bad)) : Theme.text)
-                    Text(s.networkName.map { "за час · \($0)" } ?? "за час")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
-                        .frame(maxWidth: 120, alignment: .trailing)
                 }
+                RangePills(selected: s.range, button: rangeButton)
             }
         }
     }
@@ -129,7 +138,7 @@ struct LineShape: Shape {
 
 struct StatusStrip: View {
     private let style = RenderStyle()
-    let buckets: [HourBucket]
+    let buckets: [GraphBucket]
 
     var body: some View {
         HStack(spacing: 1) {
@@ -179,7 +188,7 @@ struct HourGraph: View {
                         .font(.system(size: 9))
                         .foregroundStyle(Theme.muted)
                 } else {
-                    Text("Нет данных за час")
+                    Text("Нет данных за период")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -187,11 +196,15 @@ struct HourGraph: View {
             }
             StatusStrip(buckets: s.buckets).frame(height: 5)
             HStack {
-                Text("60 мин назад")
+                Text(s.range.axisStart)
                 Spacer()
                 if showGateway {
                     Label("интернет", systemImage: "minus").labelStyle(LegendStyle(color: lineColor))
                     Label("роутер", systemImage: "minus").labelStyle(LegendStyle(color: gatewayColor))
+                    Spacer()
+                } else if let name = s.networkName {
+                    // The medium widget has no room for a legend, so the empty middle of the axis names the network.
+                    Text(name).lineLimit(1)
                     Spacer()
                 }
                 Text("сейчас")
@@ -199,6 +212,32 @@ struct HourGraph: View {
             .font(.system(size: 9))
             .foregroundStyle(Theme.muted)
         }
+    }
+}
+
+/// Hour / day / week switch. Inside the widget each pill is an App Intent button; elsewhere it only shows the selection.
+struct RangePills: View {
+    private let style = RenderStyle()
+    let selected: StatsRange
+    let button: RangeButtonBuilder?
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ForEach(StatsRange.allCases, id: \.self) { range in
+                let label = AnyView(
+                    Text(range.title)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(range == selected ? Theme.text : Theme.muted)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(range == selected ? Color.white.opacity(style.full ? 0.20 : 0.28) : Color.clear, in: Capsule())
+                        .contentShape(Capsule())
+                )
+                if let button { button(range, label) } else { label }
+            }
+        }
+        .padding(2)
+        .background(Color.black.opacity(0.40), in: Capsule())
     }
 }
 
@@ -253,12 +292,18 @@ struct WifiRow: View {
 struct IncidentsList: View {
     private let style = RenderStyle()
     let incidents: [Incident]
+    var range: StatsRange = .hour
+    var networkName: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Инциденты за 24 часа")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Theme.muted)
+            HStack {
+                Text(range == .week ? "Инциденты за неделю" : "Инциденты за 24 часа")
+                Spacer()
+                if let networkName { Text(networkName).lineLimit(1) }
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Theme.muted)
             if incidents.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.ok)
@@ -270,10 +315,10 @@ struct IncidentsList: View {
                 ForEach(incidents.indices, id: \.self) { i in
                     let inc = incidents[i]
                     HStack(spacing: 7) {
-                        Text(Fmt.time(inc.start))
+                        Text(Fmt.when(inc.start, range: range))
                             .monospacedDigit()
                             .foregroundStyle(Theme.muted)
-                            .frame(width: 38, alignment: .leading)
+                            .frame(width: range == .week ? 64 : 38, alignment: .leading)
                         Image(systemName: inc.verdict.symbol)
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(inc.verdict.tint(fullColor: style.full))

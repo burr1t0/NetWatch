@@ -51,15 +51,14 @@ public final class SampleStore {
         }
     }
 
-    public func load(since: Date) -> [Sample] {
+    public func load(since: Date, until: Date = Date()) -> [Sample] {
         queue.sync {
             var result: [Sample] = []
             var day = Calendar.current.startOfDay(for: since)
-            let now = Date()
-            while day <= now {
+            while day <= until {
                 if let text = try? String(contentsOf: file(for: day), encoding: .utf8) {
                     for line in text.split(separator: "\n") {
-                        if var s = try? decoder.decode(Sample.self, from: Data(line.utf8)), s.t >= since {
+                        if var s = try? decoder.decode(Sample.self, from: Data(line.utf8)), s.t >= since, s.t <= until {
                             // Raw measurements are the source of truth, so rule fixes also apply to old data.
                             s.verdict = Diagnosis.verdict(for: s)
                             result.append(s)

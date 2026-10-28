@@ -30,6 +30,8 @@ fi
 tail -1 build/xcodebuild.log
 
 pkill -x NetWatch 2>/dev/null || true
+# The widget extension is a separate long-lived process; if it is left running, the system keeps showing the old build.
+pkill -x NetWatchWidget 2>/dev/null || true
 mkdir -p "$APP_DIR"
 rm -rf "$APP_DIR/NetWatch.app"
 BUILT="$DERIVED/Build/Products/Release/NetWatch.app"

@@ -20,6 +20,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// A tap on the widget arrives as netwatch://open. Launching a background app that is already running does not
+    /// raise its window by itself, so the widget asks for it explicitly.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if urls.contains(where: { $0.scheme == "netwatch" }) { showWindow() }
+    }
+
     /// Opening the app again (Spotlight, Finder) while it runs in the background brings up the settings window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showWindow()

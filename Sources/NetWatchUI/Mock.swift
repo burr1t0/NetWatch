@@ -3,11 +3,11 @@ import NetWatchCore
 
 /// Synthetic 24 hours of data with a few outages, for widget placeholders and PNG previews.
 public enum Mock {
-    public static func snapshot(now: Date = Date(), current: Verdict = .ok) -> WidgetSnapshot {
+    public static func snapshot(now: Date = Date(), current: Verdict = .ok, days: Int = 1, range: StatsRange = .hour) -> WidgetSnapshot {
         let dead = Probe(sent: 3, received: 0)
         let wifi = WiFiInfo(interface: "en0", rssi: -37, noise: -94, txRateMbps: 433, channel: 56, band: "5GHz", isDFS: true)
         var samples: [Sample] = []
-        var t = now.addingTimeInterval(-86_400)
+        var t = now.addingTimeInterval(-Double(days) * 86_400)
         var n = 0
 
         while t <= now {
@@ -28,7 +28,8 @@ public enum Mock {
                 s.direct = Probe(sent: 3, received: 3, avgMs: 85, maxMs: 120)
                 s.direct2 = Probe(sent: 3, received: 3, avgMs: 92, maxMs: 130)
             }
-            if (300...303).contains(ago) { s.dnsMs = nil } // DNS outage
+            if (300...303).contains(ago) || (4000...4004).contains(ago) { s.dnsMs = nil } // DNS outage
+            if (7300...7310).contains(ago) { s.direct = Probe(sent: 3, received: 3, avgMs: 140, maxMs: 200); s.direct2 = s.direct } // slow evening
             if (900...904).contains(ago) { s.direct = dead; s.direct2 = dead; s.tcpDirectMs = nil } // provider outage
 
             if ago < 2 {
@@ -47,6 +48,8 @@ public enum Mock {
             t = t.addingTimeInterval(60)
             n += 1
         }
-        return WidgetSnapshot.make(samples: samples, now: now)
+        // Like the real widget: raw samples for the last day, rollups for anything longer.
+        let recent = samples.filter { $0.t >= now.addingTimeInterval(-86_400) }
+        return WidgetSnapshot.make(samples: recent, now: now, range: range, rollups: Rollups.build(samples, known: []))
     }
 }

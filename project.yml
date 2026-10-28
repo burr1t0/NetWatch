@@ -37,6 +37,11 @@ targets:
         CFBundleDisplayName: NetWatch
         LSUIElement: true
         LSMinimumSystemVersion: "15.0"
+        # netwatch://open is what a tap on the widget opens.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.egor.netwatch
+            CFBundleURLSchemes:
+              - netwatch
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.egor.netwatch

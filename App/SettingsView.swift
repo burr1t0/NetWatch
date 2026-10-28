@@ -17,7 +17,12 @@ struct SettingsView: View {
                 .font(.title2.bold())
 
             // The medium preview keeps the window short enough for a small laptop screen; the large one is a widget-only size.
-            WidgetFrame { NetWatchMediumView(snapshot: refresher.snapshot) }
+            // The same period switch as on the widget, here a plain button, so the choice can be tried without leaving the window.
+            WidgetFrame {
+                NetWatchMediumView(snapshot: refresher.snapshot, rangeButton: { range, label in
+                    AnyView(Button { refresher.setRange(range) } label: { label }.buttonStyle(.plain))
+                })
+            }
                 .frame(width: WidgetSizes.medium.width, height: WidgetSizes.medium.height)
 
             agentStatus

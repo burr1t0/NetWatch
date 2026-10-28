@@ -10,6 +10,8 @@ final class WidgetRefresher: ObservableObject {
 
     private let store = SampleStore()
     private let registry = NetworkRegistry()
+    private let rollups = RollupStore()
+    private var range: StatsRange = .hour
     private let notifier: ProblemNotifier
     private let queue = DispatchQueue(label: "netwatch.refresher")
     private var timer: DispatchSourceTimer?
@@ -33,6 +35,14 @@ final class WidgetRefresher: ObservableObject {
         queue.async {
             self.windowVisible = visible
             if visible { self.publishSnapshot() }
+        }
+    }
+
+    /// Period shown in the window's preview. The widget keeps its own choice.
+    func setRange(_ newRange: StatsRange) {
+        queue.async {
+            self.range = newRange
+            self.publishSnapshot()
         }
     }
 
@@ -70,7 +80,14 @@ final class WidgetRefresher: ObservableObject {
 
     private func publishSnapshot() {
         let now = Date()
-        let snap = WidgetSnapshot.make(samples: store.load(since: now.addingTimeInterval(-86_400)), now: now, networks: registry.all())
+        let samples = store.load(since: now.addingTimeInterval(-86_400))
+        let networks = registry.all()
+        var longRollups: [Rollup] = []
+        if range != .hour {
+            let stored = rollups.load(since: now.addingTimeInterval(-range.duration - 3600))
+            longRollups = Rollups.merge(stored, with: Rollups.fresh(samples: samples, now: now, known: networks), keepSince: .distantPast)
+        }
+        let snap = WidgetSnapshot.make(samples: samples, now: now, networks: networks, range: range, rollups: longRollups)
         DispatchQueue.main.async { self.snapshot = snap }
     }
 }

@@ -15,6 +15,9 @@ public final class Monitor: @unchecked Sendable { // all mutable state is touche
     private var timer: DispatchSourceTimer?
     private var busy = false
     private var calmSamples = 0
+    private let rollups = RollupStore()
+    private let networkRegistry = NetworkRegistry()
+    private var lastRollup = Date()
 
     public init(store: SampleStore, prober: Prober = Prober(), baseInterval: TimeInterval = 30, fastInterval: TimeInterval = 3) {
         self.store = store
@@ -25,11 +28,28 @@ public final class Monitor: @unchecked Sendable { // all mutable state is touche
 
     public func start() {
         store.prune(keepDays: 30)
+        // Day by day, so the whole week is never in memory at once.
+        DispatchQueue.global(qos: .utility).async { self.backfillRollups() }
         pathMonitor.pathUpdateHandler = { [weak self] _ in
             self?.queue.async { self?.schedule(after: 1) }
         }
         pathMonitor.start(queue: queue)
         queue.async { self.schedule(after: 0) }
+    }
+
+    private func backfillRollups() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        for back in stride(from: 7, through: 0, by: -1) {
+            guard let from = calendar.date(byAdding: .day, value: -back, to: today),
+                  let to = calendar.date(byAdding: .day, value: 1, to: from) else { continue }
+            rollups.update(store: store, networks: networkRegistry.all(), from: from, to: to)
+        }
+    }
+
+    private func refreshRollups() {
+        let now = Date()
+        rollups.update(store: store, networks: networkRegistry.all(), from: now.addingTimeInterval(-7200), to: now)
     }
 
     private func schedule(after delay: TimeInterval) {
@@ -53,6 +73,10 @@ public final class Monitor: @unchecked Sendable { // all mutable state is touche
 
     private func handle(_ s: Sample) {
         store.append(s)
+        if Date().timeIntervalSince(lastRollup) >= Rollups.step {
+            lastRollup = Date()
+            DispatchQueue.global(qos: .utility).async { self.refreshRollups() }
+        }
         calmSamples = s.verdict == .ok ? calmSamples + 1 : 0
         let next: TimeInterval
         if calmSamples < 3 {
