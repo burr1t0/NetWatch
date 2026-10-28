@@ -45,6 +45,9 @@ public enum Alerts {
         let incidents = Diagnosis.incidents(from: recent, maxGap: ongoingGap)
         if let last = incidents.last, now.timeIntervalSince(last.end) <= ongoingGap {
             guard last.duration >= holdTime, state.notifiedSince != last.start else { return nil }
+            // The newest sample is fine again: the problem is already clearing, and the text (built from the latest state)
+            // would announce "all fine" as a problem.
+            guard latest.verdict != .ok else { return nil }
             if let prev = state.lastProblemAlert, now.timeIntervalSince(prev) < minGapBetweenAlerts { return nil }
             state.notifiedSince = last.start
             state.lastProblemAlert = now

@@ -30,6 +30,15 @@ final class AlertsTests: XCTestCase {
         XCTAssertNil(Alerts.next(samples: episode(from: 40, to: 0), now: now, state: &state))
     }
 
+    func testProblemThatHasJustClearedIsNotAnnounced() {
+        var state = AlertState()
+        // 100 s of trouble that ended 5 s ago: the incident still counts as ongoing, but the network is fine now.
+        var samples = episode(from: 105, to: 10)
+        samples.append(sample(0))
+        XCTAssertNil(Alerts.next(samples: samples, now: now, state: &state))
+        XCTAssertNil(state.notifiedSince)
+    }
+
     func testLongProblemAlertsOnce() {
         var state = AlertState()
         let samples = episode(from: 100, to: 0)
