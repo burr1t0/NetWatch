@@ -11,6 +11,7 @@ func usage() -> Never {
       netwatchd once [--context]            один замер; --context добавляет серию до роутера и список «кто грузит сеть»
       netwatchd report [--hours N] [--network ИМЯ]   отчёт за последние N часов (по умолчанию 24), по каждой сети отдельно
       netwatchd networks                    сети, в которых бывал Mac
+      netwatchd router                      что сейчас сообщает роутер (если это Tenda): трафик, устройства, соединение с провайдером
       netwatchd name <id|current> <имя>     назвать сеть, например: netwatchd name current Корпус А
 
     Лог: \(SampleStore.defaultDir.path)
@@ -67,6 +68,18 @@ case "networks":
         } ?? ""
         print("\(g.id.padding(toLength: 10, withPad: " ", startingAt: 0)) \(Networks.name(for: g.id, known: known).padding(toLength: 22, withPad: " ", startingAt: 0)) роутер \(gw.padding(toLength: 15, withPad: " ", startingAt: 0)) замеров \(g.samples.count), последний \(f.string(from: g.samples.last?.t ?? Date()))\(flags.isEmpty ? "" : "  [\(flags)]")")
     }
+
+case "router":
+    // One full round, so it goes through the same detection and reading as the agent does.
+    let s = await Prober().sample()
+    guard let r = s.router else {
+        print("Роутер не отдаёт данные: это не Tenda или он сейчас не ответил.")
+        exit(1)
+    }
+    func fmt(_ kbps: Double?) -> String { kbps.map { String(format: "%.2f МБ/с (%.0f КБ/с)", $0 / 1024, $0) } ?? "—" }
+    print("трафик через роутер:  ↓ \(fmt(r.wanDownKBps))   ↑ \(fmt(r.wanUpKBps))")
+    print("устройств в сети:     \(r.clients.map(String.init) ?? "—")")
+    print("соединение с провайдером держится: \(r.wanUptime.map { "\($0 / 3600) ч \($0 % 3600 / 60) мин" } ?? "—")  (код статуса \(r.wanStatus ?? "—"))")
 
 case "name":
     guard args.count >= 3 else { usage() }

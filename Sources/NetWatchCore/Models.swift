@@ -136,6 +136,8 @@ public struct Sample: Codable, Sendable {
     /// Set when this network is known to drop ICMP to the router / to the internet. Such probes say nothing either way.
     public var gwIcmpFiltered: Bool?
     public var externalIcmpFiltered: Bool?
+    /// What the router says about itself (Tenda only); nil on networks where it cannot be read.
+    public var router: RouterStats?
 
     public init(
         t: Date = Date(), iface: String? = nil, gateway: String? = nil, vpn: Bool = false,
@@ -143,8 +145,10 @@ public struct Sample: Codable, Sendable {
         dnsServer: String? = nil, dnsMs: Double? = nil, tcpDirectMs: Double? = nil, httpMs: Double? = nil,
         wifi: WiFiInfo? = nil, verdict: Verdict = .ok,
         link: LinkStats? = nil, system: SystemStats? = nil, gwBurst: [Int]? = nil, talkers: [String]? = nil,
-        network: NetworkKey? = nil, gwIcmpFiltered: Bool? = nil, externalIcmpFiltered: Bool? = nil
+        network: NetworkKey? = nil, gwIcmpFiltered: Bool? = nil, externalIcmpFiltered: Bool? = nil,
+        router: RouterStats? = nil
     ) {
+        self.router = router
         self.network = network
         self.gwIcmpFiltered = gwIcmpFiltered
         self.externalIcmpFiltered = externalIcmpFiltered

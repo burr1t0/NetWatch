@@ -44,6 +44,33 @@ public enum Report {
         return (top.key, top.value, t.withContext.count)
     }
 
+    /// What the router itself reported: reconnects to the provider, how many devices were online, and how busy the
+    /// internet port was, compared between the moments the router answered slowly and the rest of the time.
+    private static func routerSection(_ s: [Sample]) -> [String] {
+        let withRouter = s.filter { $0.router != nil }
+        guard !withRouter.isEmpty else { return [] }
+        func mbps(_ kbps: [Double]) -> Double { kbps.isEmpty ? 0 : kbps.reduce(0, +) / Double(kbps.count) / 1024 }
+        func down(_ list: [Sample]) -> [Double] { list.compactMap { $0.router?.wanDownKBps } }
+
+        var lines = ["\nРоутер (данные его страницы состояния):"]
+        let reconnects = withRouter.filter { $0.router?.reconnected == true }
+        let when = reconnects.prefix(5).map { clock($0.t, date: true) }.joined(separator: ", ")
+        lines.append("  Заново подключался к провайдеру: \(reconnects.count)" + (reconnects.isEmpty ? "" : " (\(when))"))
+        if let uptime = withRouter.last?.router?.wanUptime { lines.append("  Соединение с провайдером держится: \(dur(Double(uptime)))") }
+        let clients = withRouter.compactMap { $0.router?.clients }
+        if let lo = clients.min(), let hi = clients.max() { lines.append("  Устройств в сети: \(lo == hi ? "\(lo)" : "\(lo)–\(hi)")") }
+
+        let all = down(withRouter)
+        lines.append(String(format: "  Трафик через роутер: в среднем ↓%.2f МБ/с, пик ↓%.1f МБ/с", mbps(all), (all.max() ?? 0) / 1024))
+        let spikes = withRouter.filter(Causes.isLocalSpike)
+        if !spikes.isEmpty {
+            let calm = withRouter.filter { !Causes.isLocalSpike($0) }
+            lines.append(String(format: "  Во время скачков задержки до роутера: ↓%.2f МБ/с, в остальное время: ↓%.2f МБ/с",
+                                mbps(down(spikes)), mbps(down(calm))))
+        }
+        return lines
+    }
+
     /// Slow answers from the router itself: what else was going on at that moment?
     private static func spikeSection(_ s: [Sample]) -> [String] {
         let t = tally(s)
@@ -124,6 +151,7 @@ public enum Report {
         }
 
         out.append(contentsOf: spikeSection(s))
+        out.append(contentsOf: routerSection(s))
 
         let wifi = s.compactMap { $0.wifi }
         if !wifi.isEmpty {

@@ -2,11 +2,12 @@ import Foundation
 
 /// Why the router answered slowly. Only things this Mac can see; "external" means none of them applies.
 public enum SpikeCause: String, Codable, CaseIterable, Sendable {
-    case ownTraffic, awdl, powerSaving, cpuLoad, congestion, bursts, external
+    case ownTraffic, otherDevices, awdl, powerSaving, cpuLoad, congestion, bursts, external
 
     public var title: String {
         switch self {
         case .ownTraffic: return "Свой трафик Mac (>2 МБ/с)"
+        case .otherDevices: return "Другие устройства в сети грузят канал (по данным роутера)"
         case .awdl: return "Активность AWDL (AirDrop/Handoff)"
         case .powerSaving: return "Энергосбережение или перегрев Mac"
         case .cpuLoad: return "Высокая загрузка процессора"
@@ -20,6 +21,8 @@ public enum SpikeCause: String, Codable, CaseIterable, Sendable {
 public enum Causes {
     public static let heavyTrafficBps = 2_000_000.0
     public static let awdlBytes = 10_000
+    /// Traffic through the router that this Mac does not account for, above which other devices are blamed.
+    public static let otherDevicesBps = 3_000_000.0
 
     /// The router itself is slow, so the problem sits on the Mac–router leg or in the router.
     public static func isLocalSpike(_ s: Sample) -> Bool {
@@ -45,6 +48,12 @@ public enum Causes {
     public static func causes(for s: Sample) -> [SpikeCause] {
         guard s.link != nil || s.system != nil else { return [] }
         var result: [SpikeCause] = []
+        // The router counts everything crossing it, this Mac included; what is left over belongs to other devices.
+        if let r = s.router {
+            let wan = max(r.wanDownKBps ?? 0, r.wanUpKBps ?? 0) * 1024
+            let own = (s.link?.rxBps ?? 0) + (s.link?.txBps ?? 0)
+            if wan - own > otherDevicesBps { result.append(.otherDevices) }
+        }
         if let l = s.link {
             if l.rxBps + l.txBps > heavyTrafficBps { result.append(.ownTraffic) }
             if l.awdlBytes > awdlBytes { result.append(.awdl) }

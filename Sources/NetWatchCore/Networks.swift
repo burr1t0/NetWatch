@@ -29,6 +29,8 @@ public struct KnownNetwork: Codable, Equatable, Sendable {
     public var gatewayIcmpFiltered: Bool?
     /// Learned: ICMP to the internet is dropped (typical for campus and corporate networks); TCP and HTTPS are used instead.
     public var externalIcmpFiltered: Bool?
+    /// "tenda" when the router's status page was recognised, "other" when it answered with something else; nil until checked.
+    public var router: String?
 }
 
 /// Known networks, kept in `networks.json` next to the sample log so the agent, the app and the widget all see the same names.

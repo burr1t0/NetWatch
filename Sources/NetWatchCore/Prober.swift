@@ -21,6 +21,8 @@ public final class Prober {
     private var lastNetworkID: String?
     private var gwSilentStreak = 0
     private var externalSilentStreak = 0
+    private var routerRetryAfter: [String: Date] = [:]
+    private var lastWanUptime: (network: String, seconds: Int)?
 
     /// How many rounds in a row ICMP must stay silent while the internet works before the network is marked as filtering it.
     private static let filterStreak = 4
@@ -62,7 +64,9 @@ public final class Prober {
         // After the probes, so the router has just been talked to and is certain to be in the ARP cache.
         let key = networkKey(gateway: gateway)
         s.network = key
-        learnFilters(&s, known: registry.observe(key))
+        let known = registry.observe(key)
+        learnFilters(&s, known: known)
+        s.router = await routerStats(known: known, gateway: gateway)
         s.verdict = Diagnosis.verdict(for: s)
 
         if s.verdict != .ok || forceContext { await addContext(to: &s, gateway: gateway, iface: iface) }
@@ -109,6 +113,33 @@ public final class Prober {
         }
         s.gwIcmpFiltered = gwFiltered ? true : nil
         s.externalIcmpFiltered = externalFiltered ? true : nil
+    }
+
+    // MARK: Router
+
+    /// The router's own status, for networks whose router is a Tenda. Whether it is one is decided once and remembered;
+    /// if the router did not answer at all, asking is postponed for five minutes instead of being remembered as "not a Tenda".
+    private func routerStats(known: KnownNetwork, gateway: String) async -> RouterStats? {
+        var kind = known.router
+        if kind == nil {
+            if let retry = routerRetryAfter[known.id], retry > Date() { return nil }
+            switch await TendaClient.detect(gateway: gateway) {
+            case .tenda: kind = "tenda"
+            case .other: kind = "other"
+            case .unreachable:
+                routerRetryAfter[known.id] = Date().addingTimeInterval(300)
+                return nil
+            }
+            registry.update(id: known.id) { $0.router = kind }
+        }
+        guard kind == "tenda", var stats = await TendaClient.fetch(gateway: gateway) else { return nil }
+
+        if let last = lastWanUptime, last.network == known.id,
+           RouterStats.isReconnect(previousUptime: last.seconds, uptime: stats.wanUptime) {
+            stats.reconnected = true
+        }
+        if let uptime = stats.wanUptime { lastWanUptime = (known.id, uptime) }
+        return stats
     }
 
     // MARK: Context
