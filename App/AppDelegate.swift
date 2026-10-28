@@ -3,11 +3,13 @@ import SwiftUI
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let refresher = WidgetRefresher()
+    private let notifier = ProblemNotifier()
+    private lazy var refresher = WidgetRefresher(notifier: notifier)
     private var window: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         refresher.start()
+        notifier.requestAuthorization()
 
         // First launch: enable start-at-login (the widget only stays live while this app runs) and show the window once.
         let defaults = UserDefaults.standard
@@ -26,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showWindow() {
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(refresher: refresher)))
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(refresher: refresher, notifier: notifier)))
             w.title = "NetWatch"
             w.styleMask = [.titled, .closable, .miniaturizable]
             w.isReleasedWhenClosed = false

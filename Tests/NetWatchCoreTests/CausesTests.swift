@@ -44,6 +44,8 @@ final class CausesTests: XCTestCase {
         XCTAssertEqual(Causes.burstPattern([5, 5, 5, 220, 5, 5, 5, 5, 5, 190, 5, 5, 5, 5]), .bursts)
         XCTAssertNil(Causes.burstPattern(Array(repeating: 5, count: 20)))
         XCTAssertNil(Causes.burstPattern([5, 5, 200]))
+        // Real capture from a Mac with AWDL active: fast and slow echoes alternate, so this is not plain congestion.
+        XCTAssertEqual(Causes.burstPattern([3, 119, 3, 138, 3, 144, 3, 134, 3, 125, 4, 153, 4, 146, 22, 131, 4, 4, 6, 4]), .bursts)
         // Lost echoes (-1) are ignored when judging the shape.
         XCTAssertEqual(Causes.burstPattern([-1, -1, 90, 95, 100, 92, 97, 99, 101, 94]), .congestion)
     }

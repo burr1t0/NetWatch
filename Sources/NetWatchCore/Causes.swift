@@ -11,7 +11,7 @@ public enum SpikeCause: String, Codable, CaseIterable, Sendable {
         case .powerSaving: return "Энергосбережение или перегрев Mac"
         case .cpuLoad: return "Высокая загрузка процессора"
         case .congestion: return "Ровно высокая задержка (затор в роутере или эфире)"
-        case .bursts: return "Периодические всплески (сканы Wi-Fi, AWDL)"
+        case .bursts: return "Эфир периодически занят (AWDL: AirDrop/Handoff, сканы Wi-Fi)"
         case .external: return "Ничего локального не найдено (роутер, другие устройства, радиоэфир)"
         }
     }
@@ -31,7 +31,12 @@ public enum Causes {
         let ok = series.filter { $0 >= 0 }
         guard ok.count >= 8 else { return nil }
         let median = ok.sorted()[ok.count / 2]
-        if median > 30 { return .congestion }
+        if median > 30 {
+            // Fast replies mixed in with slow ones (3, 130, 3, 140, ...) mean the radio keeps leaving the channel,
+            // which is how AWDL behaves; a congested link is slow for every echo.
+            let fast = ok.filter { $0 <= 15 }.count
+            return Double(fast) >= Double(ok.count) * 0.25 ? .bursts : .congestion
+        }
         let peaks = ok.filter { $0 > max(30, median * 4) }.count
         return peaks >= 2 ? .bursts : nil
     }

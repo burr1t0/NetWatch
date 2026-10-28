@@ -1,11 +1,14 @@
 import SwiftUI
 import ServiceManagement
+import UserNotifications
 import NetWatchCore
 import NetWatchUI
 
 struct SettingsView: View {
     @ObservedObject var refresher: WidgetRefresher
+    @ObservedObject var notifier: ProblemNotifier
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @AppStorage(ProblemNotifier.enabledKey) private var notify = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -28,6 +31,17 @@ struct SettingsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
+            Toggle("Уведомлять о проблемах, которые длятся дольше минуты", isOn: $notify)
+            HStack(spacing: 10) {
+                Button("Проверить уведомление") { notifier.sendTest() }
+                    .disabled(!notify)
+                if notifier.authorization == .denied {
+                    Label("Уведомления выключены для NetWatch в Системных настройках", systemImage: "bell.slash")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.warn)
+                }
+            }
+
             HStack {
                 Button("Обновить виджет") { refresher.reloadNow() }
                 Spacer()
@@ -41,7 +55,10 @@ struct SettingsView: View {
         .padding(20)
         .frame(width: WidgetSizes.large.width + 40)
         .preferredColorScheme(.dark)
-        .onAppear { refresher.setWindowVisible(true) }
+        .onAppear {
+            refresher.setWindowVisible(true)
+            notifier.refreshStatus()
+        }
         .onDisappear { refresher.setWindowVisible(false) }
     }
 

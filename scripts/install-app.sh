@@ -16,8 +16,14 @@ if [[ -z "$TEAM" ]]; then
 fi
 
 xcodegen generate
-xcodebuild -project NetWatch.xcodeproj -scheme NetWatch -configuration Release \
-    -derivedDataPath build/xcode -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM" build | tail -5
+mkdir -p build
+if ! xcodebuild -project NetWatch.xcodeproj -scheme NetWatch -configuration Release \
+    -derivedDataPath build/xcode -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM" build > build/xcodebuild.log 2>&1; then
+    grep -E "error:" build/xcodebuild.log | head -10 >&2
+    echo "Сборка не удалась, полный лог: build/xcodebuild.log" >&2
+    exit 1
+fi
+tail -1 build/xcodebuild.log
 
 pkill -x NetWatch 2>/dev/null || true
 mkdir -p "$APP_DIR"
