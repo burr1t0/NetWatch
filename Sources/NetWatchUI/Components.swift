@@ -70,7 +70,9 @@ struct StatusHeader: View {
                         .foregroundStyle(style.full ? (a > 0.99 ? Theme.ok : (a > 0.95 ? Theme.warn : Theme.bad)) : Theme.text)
                 }
                 RangePills(selected: s.range, button: rangeButton)
+                    .fixedSize()
             }
+            .layoutPriority(1)
         }
     }
 }
@@ -230,6 +232,8 @@ struct RangePills: View {
                 let label = AnyView(
                     Text(range.title)
                         .font(.system(size: 9, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundStyle(range == selected ? Theme.text : Theme.muted)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
