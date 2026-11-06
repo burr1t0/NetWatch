@@ -50,7 +50,7 @@ public enum Rollups {
             r.seconds += weights[i]
             if s.verdict == .ok { r.okSeconds += weights[i] }
             if let g = s.gw?.avgMs { r.gwMax = max(r.gwMax ?? 0, g) }
-            if let d = s.directRttMs { r.rttMax = max(r.rttMax ?? 0, d) }
+            if let d = s.graphRttMs { r.rttMax = max(r.rttMax ?? 0, d) }
             if s.verdict.severity > r.worst.severity { r.worst = s.verdict }
             acc[key] = r
         }

@@ -204,7 +204,7 @@ struct HourGraph: View {
                 Text(s.range.axisStart)
                 Spacer()
                 if showGateway {
-                    Label("интернет", systemImage: "minus").labelStyle(LegendStyle(color: lineColor))
+                    Label(s.rttViaVPN ? "через VPN" : "интернет", systemImage: "minus").labelStyle(LegendStyle(color: lineColor))
                     Label("роутер", systemImage: "minus").labelStyle(LegendStyle(color: gatewayColor))
                     Spacer()
                 } else if let name = s.networkName {

@@ -21,6 +21,16 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(snap.buckets.count, WidgetSnapshot.bucketCount)
     }
 
+    func testClosedDirectPathPlotsTheVPNTimeInstead() {
+        let dead = Probe(sent: 3, received: 0)
+        var closed = sample(10)
+        closed.vpn = true; closed.direct = dead; closed.direct2 = dead; closed.dnsMs = nil; closed.tcpDirectMs = 1; closed.httpMs = 120
+        let snap = WidgetSnapshot.make(samples: [closed], now: now)
+        XCTAssertTrue(snap.rttViaVPN)
+        XCTAssertEqual(snap.buckets.compactMap { $0.rttMs }, [120])
+        XCTAssertFalse(WidgetSnapshot.make(samples: [sample(10)], now: now).rttViaVPN)
+    }
+
     func testOldSampleIsStale() {
         let snap = WidgetSnapshot.make(samples: [sample(600)], now: now)
         XCTAssertTrue(snap.isStale)

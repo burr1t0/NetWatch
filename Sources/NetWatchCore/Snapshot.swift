@@ -32,6 +32,8 @@ public struct WidgetSnapshot: Sendable {
     public var networkID: String?
     public var networkName: String?
     public var range: StatsRange
+    /// The "internet" line currently shows HTTPS through the VPN, because the direct path is closed (a kill switch).
+    public var rttViaVPN: Bool = false
 
     /// Builds the picture for the network the Mac is on now; samples from other networks are left out.
     /// The hour graph comes from raw samples. Day and week come from `rollups`, because raw samples for that long are too heavy.
@@ -63,7 +65,7 @@ public struct WidgetSnapshot: Sendable {
             availability: graph.availability,
             networkID: networkID,
             networkName: networkID.map { Networks.name(for: $0, known: networks) },
-            range: range
+            range: range, rttViaVPN: !stale && latest?.directPathClosed == true
         )
     }
 
@@ -74,7 +76,7 @@ public struct WidgetSnapshot: Sendable {
         for s in hour {
             let i = min(bucketCount - 1, max(0, Int(s.t.timeIntervalSince(hourStart) / 60)))
             if let g = s.gw?.avgMs { buckets[i].gwMs = max(buckets[i].gwMs ?? 0, g) }
-            if let r = s.directRttMs { buckets[i].rttMs = max(buckets[i].rttMs ?? 0, r) }
+            if let r = s.graphRttMs { buckets[i].rttMs = max(buckets[i].rttMs ?? 0, r) }
             if (buckets[i].verdict?.severity ?? -1) < s.verdict.severity { buckets[i].verdict = s.verdict }
         }
 

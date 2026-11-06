@@ -186,6 +186,9 @@ public extension Sample {
         vpn && httpMs != nil && (direct?.loss ?? 1) >= 0.5 && (direct2?.loss ?? 1) >= 0.5 && dnsServer != nil && dnsMs == nil
     }
 
+    /// What the "internet" line of the graph shows: the direct round trip, or while the direct path is closed, HTTPS through the VPN.
+    var graphRttMs: Double? { directPathClosed ? httpMs : directRttMs }
+
     var summaryLine: String {
         func ms(_ v: Double?) -> String { v.map { String(format: "%.0fms", $0) } ?? "—" }
         func probe(_ p: Probe?) -> String {
