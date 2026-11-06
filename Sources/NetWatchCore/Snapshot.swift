@@ -114,6 +114,8 @@ public struct WidgetSnapshot: Sendable {
             return ("Нет свежих данных", "Последний замер \(minutes) мин назад — агент остановлен?")
         }
         switch s.verdict {
+        case .ok where s.directPathClosed:
+            return ("Всё в порядке", "Роутер \(ms(s.gw?.avgMs)) · через VPN \(ms(s.httpMs)) · прямой путь закрыт")
         case .ok: return ("Всё в порядке", "Роутер \(ms(s.gw?.avgMs)) · интернет \(ms(s.directRttMs))")
         case .degraded: return ("Нестабильное соединение", reason(s))
         case .dns: return ("Проблема с DNS", "Сервер \(s.dnsServer ?? "—") не отвечает")

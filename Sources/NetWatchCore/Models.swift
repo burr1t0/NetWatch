@@ -175,7 +175,15 @@ public struct Sample: Codable, Sendable {
 public extension Sample {
     /// Best (lowest) average RTT to the internet over the physical interface. Where ICMP is dropped, the TCP handshake time stands in.
     var directRttMs: Double? {
-        [direct?.avgMs, direct2?.avgMs].compactMap { $0 }.min() ?? tcpDirectMs
+        if directPathClosed { return nil }
+        return [direct?.avgMs, direct2?.avgMs].compactMap { $0 }.min() ?? tcpDirectMs
+    }
+
+    /// The physical interface is closed to everything but the VPN (typically a VPN app's kill switch): ping and DNS over it fail
+    /// while HTTPS through the tunnel works. Direct probes then say nothing about the real connection, and a TCP "handshake"
+    /// that completes in about a millisecond was answered locally, not by the internet.
+    var directPathClosed: Bool {
+        vpn && httpMs != nil && (direct?.loss ?? 1) >= 0.5 && (direct2?.loss ?? 1) >= 0.5 && dnsServer != nil && dnsMs == nil
     }
 
     var summaryLine: String {

@@ -30,6 +30,11 @@ public enum Diagnosis {
         let icmpDown = (s.direct?.loss ?? 1) >= 0.5 && (s.direct2?.loss ?? 1) >= 0.5
         // Without ICMP, a TCP handshake (or, failing that, the HTTPS check) is the evidence that the internet is there.
         let reachable = s.tcpDirectMs != nil || (extFiltered && s.httpMs != nil)
+        // Kill switch: nothing but the VPN gets out, so only the router and the tunnel itself can be judged.
+        if s.directPathClosed {
+            let slowOrSilent = gwSilent || (gwFiltered ? 0 : (s.gw?.avgMs ?? 0)) > 30 || (s.httpMs ?? 0) > 3000
+            return slowOrSilent ? .degraded : .ok
+        }
         let internetDown = (icmpDown || extFiltered) && !reachable
         if internetDown { return gwSilent ? .wifiOrRouter : .isp }
         if s.dnsServer != nil && s.dnsMs == nil { return .dns }

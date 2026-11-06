@@ -15,6 +15,26 @@ final class DiagnosisTests: XCTestCase {
         XCTAssertEqual(Diagnosis.verdict(for: healthy()), .ok)
     }
 
+    func testClosedDirectPathBehindWorkingVPNIsNotAProblem() {
+        // A kill switch: ping and DNS over the physical interface fail, a local "handshake" completes in 1 ms, HTTPS via VPN works.
+        var s = healthy(); s.vpn = true; s.direct = dead; s.direct2 = dead; s.dnsMs = nil; s.tcpDirectMs = 1
+        XCTAssertTrue(s.directPathClosed)
+        XCTAssertEqual(Diagnosis.verdict(for: s), .ok)
+        XCTAssertNil(s.directRttMs)
+    }
+
+    func testBrokenDnsWithoutVPNIsStillADnsProblem() {
+        var s = healthy(); s.dnsMs = nil
+        XCTAssertFalse(s.directPathClosed)
+        XCTAssertEqual(Diagnosis.verdict(for: s), .dns)
+    }
+
+    func testVPNDownWithClosedDirectPathIsStillAVPNProblem() {
+        var s = healthy(); s.vpn = true; s.direct = dead; s.direct2 = dead; s.dnsMs = nil; s.httpMs = nil; s.tcpDirectMs = 1
+        XCTAssertFalse(s.directPathClosed)
+        XCTAssertNotEqual(Diagnosis.verdict(for: s), .ok)
+    }
+
     func testNoGatewayMeansNoLink() {
         var s = healthy(); s.gateway = nil
         XCTAssertEqual(Diagnosis.verdict(for: s), .noLink)
